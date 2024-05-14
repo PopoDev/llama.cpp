@@ -56,10 +56,6 @@
 #define GGML_USE_CUDA_SYCL
 #endif
 
-#if (defined(GGML_USE_CUDA) || defined(GGML_USE_SYCL)) || defined(GGML_USE_VULKAN)
-#define GGML_USE_CUDA_SYCL_VULKAN
-#endif
-
 #if defined(LLAMA_USE_CURL)
 #ifdef __linux__
 #include <linux/limits.h>
@@ -1055,9 +1051,6 @@ bool gpt_params_find_arg(int argc, char ** argv, const std::string & arg, gpt_pa
                 params.tensor_split[i] = 0.0f;
             }
         }
-#ifndef GGML_USE_CUDA_SYCL_VULKAN
-        fprintf(stderr, "warning: llama.cpp was compiled without CUDA/SYCL/Vulkan. Setting a tensor split has no effect.\n");
-#endif // GGML_USE_CUDA_SYCL_VULKAN
         return true;
     }
     if (arg == "--rpc") {
@@ -2604,9 +2597,7 @@ void dump_non_result_info_yaml(FILE * stream, const gpt_params & params, const l
     fprintf(stream, "cpu_has_avx512_vbmi: %s\n", ggml_cpu_has_avx512_vbmi() ? "true" : "false");
     fprintf(stream, "cpu_has_avx512_vnni: %s\n", ggml_cpu_has_avx512_vnni() ? "true" : "false");
     fprintf(stream, "cpu_has_cuda: %s\n",        ggml_cpu_has_cuda()        ? "true" : "false");
-    fprintf(stream, "cpu_has_vulkan: %s\n",      ggml_cpu_has_vulkan()      ? "true" : "false");
     fprintf(stream, "cpu_has_clblast: %s\n",     ggml_cpu_has_clblast()     ? "true" : "false");
-    fprintf(stream, "cpu_has_kompute: %s\n",     ggml_cpu_has_kompute()     ? "true" : "false");
     fprintf(stream, "cpu_has_fma: %s\n",         ggml_cpu_has_fma()         ? "true" : "false");
     fprintf(stream, "cpu_has_gpublas: %s\n",     ggml_cpu_has_gpublas()     ? "true" : "false");
     fprintf(stream, "cpu_has_neon: %s\n",        ggml_cpu_has_neon()        ? "true" : "false");
