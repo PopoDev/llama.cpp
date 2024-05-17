@@ -14,6 +14,8 @@
 #include <sstream>
 #include <string>
 #include <vector>
+#include <numeric>
+#include <sys/sysinfo.h>
 
 #if defined (__unix__) || (defined (__APPLE__) && defined (__MACH__))
 #include <signal.h>
@@ -115,6 +117,42 @@ static void llama_log_callback_logTee(ggml_log_level level, const char * text, v
     (void) level;
     (void) user_data;
     LOG_TEE("%s", text);
+}
+
+static long get_cpu_ram() {
+    struct sysinfo memInfo;
+    sysinfo(&memInfo);
+    long totalVirtualMem = memInfo.totalram + memInfo.totalswap;
+    totalVirtualMem *= memInfo.mem_unit;
+    long virtualMemUsed = memInfo.totalram - memInfo.freeram;
+    virtualMemUsed += memInfo.totalswap - memInfo.freeswap;
+    virtualMemUsed *= memInfo.mem_unit;
+    return virtualMemUsed / (1024 * 1024); // Convert to MiB
+}
+
+static long get_gpu_ram() {
+    FILE* fp = popen("nvidia-smi --query-gpu=memory.used --format=csv,noheader,nounits", "r");
+    if (!fp) {
+        std::cerr << "Failed to run nvidia-smi\n";
+        return -1;
+    }
+    char buffer[128];
+    long total_gpu_ram = 0;
+    while (fgets(buffer, sizeof(buffer), fp) != NULL) {
+        total_gpu_ram += atol(buffer);
+    }
+
+    pclose(fp);
+    return total_gpu_ram;
+}
+
+static void llama_print_ram(std::vector<long> cpu_ram_usage, std::vector<long> gpu_ram_usage) {
+    long cpu_ram = std::accumulate(cpu_ram_usage.begin(), cpu_ram_usage.end(), 0.0f) / cpu_ram_usage.size();
+    long gpu_ram = std::accumulate(gpu_ram_usage.begin(), gpu_ram_usage.end(), 0.0f) / gpu_ram_usage.size();
+
+    LOG_TEE("\n");
+    LOG_TEE("%s: CPU RAM (MiB) = %ld\n", __func__, cpu_ram);
+    LOG_TEE("%s: GPU RAM (MiB) = %ld\n", __func__, gpu_ram);
 }
 
 int main(int argc, char ** argv) {
@@ -528,12 +566,24 @@ int main(int argc, char ** argv) {
         exit(1);
     }
 
+    // Store CPU and GPU usage RAM
+    std::vector<long> cpu_ram_usage;
+    std::vector<long> gpu_ram_usage;
+
     while ((n_remain != 0 && !is_antiprompt) || params.interactive) {
         // predict
         if (!embd.empty()) {
             // Note: (n_ctx - 4) here is to match the logic for commandline prompt handling via
             // --prompt or --file which uses the same value.
             int max_embd_size = n_ctx - 4;
+
+            long cpu_ram = get_cpu_ram();
+            long gpu_ram = get_gpu_ram();
+
+            if (cpu_ram >= 0.0 && gpu_ram >= 0.0) {
+                cpu_ram_usage.push_back(cpu_ram);
+                gpu_ram_usage.push_back(gpu_ram);
+            }
 
             // Ensure the input doesn't exceed the context size by truncating embd if necessary.
             if ((int) embd.size() > max_embd_size) {
@@ -945,6 +995,7 @@ int main(int argc, char ** argv) {
         llama_state_save_file(ctx, path_session.c_str(), session_tokens.data(), session_tokens.size());
     }
 
+    llama_print_ram(cpu_ram_usage, gpu_ram_usage);
     llama_print_timings(ctx);
     write_logfile(ctx, params, model, input_tokens, output_ss.str(), output_tokens);
 

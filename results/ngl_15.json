@@ -1,4 +1,6 @@
 {
     "n_gpu_layers": 15,
-    "tokens_per_second": 13.84
+    "tokens_per_second": 13.58,
+    "cpu_ram_mib": 11412,
+    "gpu_ram_mib": 8564
 }
