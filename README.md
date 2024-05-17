@@ -53,3 +53,18 @@ After downloading the model, you can run inference using the following command:
 ```bash
 ./main -ngl 35 -m mistral-7b-instruct-v0.2.Q4_K_M.gguf --color -c 32768 --temp 0.7 --repeat_penalty 1.1 -n -1  -p "Who won the 2018 world cup?"
 ```
+
+## Experiments
+
+### GPU acceleration
+
+We run experiments varying the `n_gpu_layers` parameter to see how the GPU acceleration affects the inference time. We use the `Mistral-7B-Instruct-v0.2-GGUF` model on a NVIDIA RTX 2080 GPU and a context size of 32768. The prompt is "What is the capital of the United States?". We use the seed `470` for reproducibility.
+
+```bash
+# Quick run:
+./main -ngl 35 -c 32768 -s 470 -m mistral-7b-instruct-v0.2.Q4_K_M.gguf -p "What is the capital of the United States?"
+
+# Script to run the experiments
+python scripts/n_gpu_layers.py
+```
+
