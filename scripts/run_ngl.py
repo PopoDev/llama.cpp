@@ -17,9 +17,9 @@ def save_results(n_gpu_layers, tokens_per_second, cpu_ram, gpu_ram):
         "cpu_ram_mib": cpu_ram,
         "gpu_ram_mib": gpu_ram
     }
-    if not os.path.exists('results'):
-        os.makedirs('results')
-    with open(f'results/ngl_{n_gpu_layers}.json', 'w') as f:
+    if not os.path.exists('results/ngl'):
+        os.makedirs('results/ngl')
+    with open(f'results/ngl/ngl_{n_gpu_layers}.json', 'w') as f:
         json.dump(results, f, indent=4)
 
 def parse_output(output):
