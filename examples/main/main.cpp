@@ -119,6 +119,56 @@ static void llama_log_callback_logTee(ggml_log_level level, const char * text, v
     LOG_TEE("%s", text);
 }
 
+struct cpu_data {
+    std::string cpu;
+    long user;
+    long nice;
+    long system;
+    long idle;
+    long iowait;
+    long irq;
+    long softirq;
+    long steal;
+    long guest;
+    long guest_nice;
+};
+
+static std::vector<cpu_data> read_cpu_data() {
+    std::ifstream file("/proc/stat");
+    std::string line;
+    std::vector<cpu_data> result;
+    
+    while (std::getline(file, line)) {
+        if (line.substr(0, 3) == "cpu") {
+            std::istringstream ss(line);
+            cpu_data data;
+            ss >> data.cpu >> data.user >> data.nice >> data.system >> data.idle >> data.iowait >> data.irq >> data.softirq >> data.steal >> data.guest >> data.guest_nice;
+            result.push_back(data);
+        }
+    }
+    
+    return result;
+}
+
+static std::vector<float> get_cpu_usage_per_core() {
+    std::vector<float> cpu_usage_per_core;
+    std::vector<cpu_data> cpu_data_list = read_cpu_data();
+
+    size_t num_cores = std::thread::hardware_concurrency();
+    cpu_usage_per_core.resize(num_cores);
+
+    for (size_t core = 0; core < num_cores; ++core) {
+        if (core < cpu_data_list.size()) {
+            cpu_usage_per_core[core] = cpu_data_list[core].user / cpu_data_list[core].idle;
+        } else {
+            cpu_usage_per_core[core] = 0.0f;
+        }
+    }
+
+    return cpu_usage_per_core;
+}
+
+
 static long get_cpu_ram() {
     struct sysinfo memInfo;
     sysinfo(&memInfo);
@@ -131,6 +181,10 @@ static long get_cpu_ram() {
 }
 
 static long get_gpu_ram() {
+    if (!ggml_cpu_has_cuda()) {
+        return 0;
+    }
+
     FILE* fp = popen("nvidia-smi --query-gpu=memory.used --format=csv,noheader,nounits", "r");
     if (!fp) {
         std::cerr << "Failed to run nvidia-smi\n";
@@ -146,13 +200,20 @@ static long get_gpu_ram() {
     return total_gpu_ram;
 }
 
-static void llama_print_ram(std::vector<long> cpu_ram_usage, std::vector<long> gpu_ram_usage) {
-    long cpu_ram = std::accumulate(cpu_ram_usage.begin(), cpu_ram_usage.end(), 0.0f) / cpu_ram_usage.size();
-    long gpu_ram = std::accumulate(gpu_ram_usage.begin(), gpu_ram_usage.end(), 0.0f) / gpu_ram_usage.size();
+static void llama_print_ram(std::vector<long> cpu_ram_list, std::vector<long> gpu_ram_list, std::vector<std::vector<float>> cpu_usage_per_core_list) {
+    long cpu_ram = std::accumulate(cpu_ram_list.begin(), cpu_ram_list.end(), 0) / cpu_ram_list.size();
+    long gpu_ram = std::accumulate(gpu_ram_list.begin(), gpu_ram_list.end(), 0) / gpu_ram_list.size();
+    std::vector<float> cpu_usage_per_core(cpu_usage_per_core_list[0].size(), 0.0f);
 
     LOG_TEE("\n");
     LOG_TEE("%s: CPU RAM (MiB) = %ld\n", __func__, cpu_ram);
     LOG_TEE("%s: GPU RAM (MiB) = %ld\n", __func__, gpu_ram);
+    for (size_t i = 0; i < cpu_usage_per_core.size(); ++i) {
+        for (size_t j = 0; j < cpu_usage_per_core_list.size(); ++j) {
+            cpu_usage_per_core[i] += cpu_usage_per_core_list[j][i];
+        }
+        LOG_TEE("%s: CPU Core %zu Usage = %.2f%%\n", __func__, i, cpu_usage_per_core[i] / cpu_usage_per_core_list.size());
+    }
 }
 
 int main(int argc, char ** argv) {
@@ -567,8 +628,9 @@ int main(int argc, char ** argv) {
     }
 
     // Store CPU and GPU usage RAM
-    std::vector<long> cpu_ram_usage;
-    std::vector<long> gpu_ram_usage;
+    std::vector<std::vector<float>> cpu_usage_per_core_list;
+    std::vector<long> cpu_ram_list;
+    std::vector<long> gpu_ram_list;
 
     while ((n_remain != 0 && !is_antiprompt) || params.interactive) {
         // predict
@@ -577,13 +639,25 @@ int main(int argc, char ** argv) {
             // --prompt or --file which uses the same value.
             int max_embd_size = n_ctx - 4;
 
+            std::vector<float> cpu_usage_per_core = get_cpu_usage_per_core();
             long cpu_ram = get_cpu_ram();
             long gpu_ram = get_gpu_ram();
 
             if (cpu_ram >= 0.0 && gpu_ram >= 0.0) {
-                cpu_ram_usage.push_back(cpu_ram);
-                gpu_ram_usage.push_back(gpu_ram);
+                cpu_ram_list.push_back(cpu_ram);
+                gpu_ram_list.push_back(gpu_ram);
             }
+
+            if (cpu_usage_per_core.size() > 0) {
+                cpu_usage_per_core_list.push_back(cpu_usage_per_core);
+            }
+
+            /*
+            std::vector<cpu_data> cpu_data = read_cpu_data();
+            for (size_t i = 0; i < cpu_data.size(); ++i) {
+                LOG_TEE("CPU %s: user = %ld, system = %ld, idle = %ld\n", cpu_data[i].cpu.c_str(), cpu_data[i].user, cpu_data[i].system, cpu_data[i].idle);
+            }
+            */
 
             // Ensure the input doesn't exceed the context size by truncating embd if necessary.
             if ((int) embd.size() > max_embd_size) {
@@ -995,7 +1069,7 @@ int main(int argc, char ** argv) {
         llama_state_save_file(ctx, path_session.c_str(), session_tokens.data(), session_tokens.size());
     }
 
-    llama_print_ram(cpu_ram_usage, gpu_ram_usage);
+    llama_print_ram(cpu_ram_list, gpu_ram_list, cpu_usage_per_core_list);
     llama_print_timings(ctx);
     write_logfile(ctx, params, model, input_tokens, output_ss.str(), output_tokens);
 
