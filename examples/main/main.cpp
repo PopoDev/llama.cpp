@@ -208,12 +208,14 @@ static void llama_print_ram(std::vector<long> cpu_ram_list, std::vector<long> gp
     LOG_TEE("\n");
     LOG_TEE("%s: CPU RAM (MiB) = %ld\n", __func__, cpu_ram);
     LOG_TEE("%s: GPU RAM (MiB) = %ld\n", __func__, gpu_ram);
+    /*
     for (size_t i = 0; i < cpu_usage_per_core.size(); ++i) {
         for (size_t j = 0; j < cpu_usage_per_core_list.size(); ++j) {
             cpu_usage_per_core[i] += cpu_usage_per_core_list[j][i];
         }
         LOG_TEE("%s: CPU Core %zu Usage = %.2f%%\n", __func__, i, cpu_usage_per_core[i] / cpu_usage_per_core_list.size());
     }
+    */
 }
 
 int main(int argc, char ** argv) {
