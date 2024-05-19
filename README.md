@@ -85,3 +85,21 @@ python scripts/threads.py
 # Script to plot the results
 python scripts/show_threads.py
 ```
+
+### CPU-only vs GPU acceleration
+
+- CPU: Intel i7-5820K CPU @ 3.30GHz with 6 cores and 2 threads per core
+- GPU: NVIDIA RTX 2080 with 12GB of VRAM
+
+```bash
+# CPU-only
+./main -t -c 32768 -s 470 -m mistral-7b-instruct-v0.2.Q4_K_M.gguf -p "What is the capital of the United States?"
+
+# GPU acceleration
+./main -ngl 35 -c 32768 -s 470 -m mistral-7b-instruct-v0.2.Q4_K_M.gguf -p "What is the capital of the United States?"
+```
+
+## Results
+- CPU: 8.47 tokens/s
+- GPU: 81.89 tokens/s
+
