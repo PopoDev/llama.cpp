@@ -3,9 +3,11 @@ import json
 import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
+import argparse
 
-def load_results(results_dir='results/ngl'):
+def load_results(results_dir='results/ngl', hardware='RTX_2080'):
     data = []
+    results_dir += '/' + hardware
     for filename in os.listdir(results_dir):
         if filename.endswith('.json'):
             with open(os.path.join(results_dir, filename), 'r') as f:
@@ -19,11 +21,15 @@ def plot_results(data):
 
     fig, ax1 = plt.subplots(figsize=(12, 6))
 
-    color = 'tab:green'
+    color_gpu_ram = 'tab:green'
+    color_cpu_ram = 'tab:red'
     ax1.set_xlabel('Number of GPU Layers')
-    ax1.set_ylabel('GPU RAM (MiB)', color=color)
-    sns.lineplot(data=df, x='n_gpu_layers', y='gpu_ram_mib', marker='o', ax=ax1, color=color, label='GPU RAM (MiB)')
-    ax1.tick_params(axis='y', labelcolor=color)
+    ax1.set_ylabel('RAM (MiB)')
+    
+    sns.lineplot(data=df, x='n_gpu_layers', y='gpu_ram_mib', marker='o', ax=ax1, color=color_gpu_ram, label='GPU RAM (MiB)')
+    sns.lineplot(data=df, x='n_gpu_layers', y='cpu_ram_mib', marker='o', ax=ax1, color=color_cpu_ram, label='CPU RAM (MiB)')
+    ax1.tick_params(axis='y')
+
 
     ax2 = ax1.twinx()  # instantiate a second axes that shares the same x-axis
     color = 'tab:blue'
@@ -45,5 +51,9 @@ def plot_results(data):
     plt.savefig(f'{results_dir}/graph_ngl.png')
 
 if __name__ == "__main__":
-    results_data = load_results()
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--hardware', type=str, default='RTX_2080', help='Hardware to show results for')
+    args = parser.parse_args()
+
+    results_data = load_results(hardware=args.hardware)
     plot_results(results_data)
