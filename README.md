@@ -88,9 +88,6 @@ python scripts/show_threads.py
 
 ### CPU-only vs GPU acceleration
 
-- CPU: Intel i7-5820K CPU @ 3.30GHz with 6 cores and 2 threads per core
-- GPU: NVIDIA RTX 2080 with 12GB of VRAM
-
 ```bash
 # CPU-only
 ./main -t -c 32768 -s 470 -m mistral-7b-instruct-v0.2.Q4_K_M.gguf -p "What is the capital of the United States?"
@@ -99,7 +96,17 @@ python scripts/show_threads.py
 ./main -ngl 35 -c 32768 -s 470 -m mistral-7b-instruct-v0.2.Q4_K_M.gguf -p "What is the capital of the United States?"
 ```
 
-## Results
-- CPU: 8.47 tokens/s
-- GPU: 81.89 tokens/s
+- Experiment 1
+    - CPU hardware: Intel i7-8700K CPU @ 3.70GHz with 6 cores and 2 threads per core
+    - GPU hardware: 2 NVIDIA RTX 2080 with 8GB of VRAM
+    - CPU inference: 8.47 tokens/s
+    - GPU inference: 81.89 tokens/s
+    - Speedup: 9.67x
+- Experiment 2
+    - CPU hardware: Intel Xeon CPU @ 2.20GHz with 1 core and 2 threads per core
+    - GPU hardware: NVIDIA Tesla T4 with 16GB of VRAM
+    - CPU inference: 1.57 tokens/s
+    - GPU inference: 37.62 tokens/s
+    - Speedup: 23.96x
+
 
